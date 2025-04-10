@@ -4,7 +4,10 @@ import numpy as np
 import cv2
 from datetime import datetime
 import threading
+import tkinter as tk
+from tkinter import ttk, scrolledtext, simpledialog, messagebox
 
+isFirstTime = False
 CLICK_POSITIONS = {
     'agree_button': (685, 310),  # ตำแหน่งปุ่มตกลง
     'allow_button': (631, 328),
@@ -59,6 +62,42 @@ CLICK_POSITIONS = {
     'load_tutorial_completed'  : (14, 526)
 
 }
+def check_character_from_gacha(device, target_character):
+    """
+    ตรวจสอบตัวละครที่ได้จากกาชาโดยใช้การจับภาพหน้าจอ
+    - device: ชื่ออุปกรณ์ emulator
+    - target_character: ชื่อตัวละครที่ต้องการ (ต้องเตรียมภาพตัวอย่างไว้ในโฟลเดอร์)
+    """
+    try:
+        print(f"🔍 [Device: {device}] กำลังตรวจสอบตัวละครที่ได้จากกาชา...")
+        
+        # จับภาพหน้าจอตอนได้รับตัวละคร
+        img = screencap(device)
+        
+        # โหลดภาพตัวอย่างตัวละครที่ต้องการ
+        template_path = f"templates/{target_character}.png"
+        if not os.path.exists(template_path):
+            print(f"⚠️ ไม่พบไฟล์ภาพตัวอย่างสำหรับ {target_character}")
+            return False
+            
+        template = cv2.imread(template_path, cv2.IMREAD_COLOR)
+        
+        # ใช้ Template Matching
+        result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+        
+        # กำหนด threshold การจับคู่ (ปรับตามความเหมาะสม)
+        threshold = 0.8
+        if max_val >= threshold:
+            print(f"✅ [Device: {device}] พบตัวละครที่ต้องการ: {target_character}")
+            return True
+        else:
+            print(f"❌ [Device: {device}] ไม่พบตัวละครที่ต้องการ")
+            return False
+            
+    except Exception as e:
+        print(f"⚠️ [Device: {device}] เกิดข้อผิดพลาดขณะตรวจสอบตัวละคร: {e}")
+        return False
 
 def check_special_days(date=None):
     """
@@ -91,7 +130,6 @@ def get_emulators():
     except subprocess.CalledProcessError as e:
         print(f"❌ เกิดข้อผิดพลาดในการดึง emulator: {e}")
         return []
-# ✅ กดปุ่ม "กลับ" (Back)
 
 def press_back_button(device):
     print(f"🔙 กดปุ่มกลับบน {device}")
@@ -195,7 +233,7 @@ def play_until_load_data(device):
             return False
 
         # ขั้นตอนที่ 1: ข้ามและเริ่มเกม
-        click_with_delay(device, *CLICK_POSITIONS['skip'], delay_after=2)
+        click_with_delay(device, *CLICK_POSITIONS['skip'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['start_btn_skip'], delay_after=10)
         
         # ขั้นตอนที่ 2: เลือกโหมดและสเตจ
@@ -204,22 +242,23 @@ def play_until_load_data(device):
         
         # ขั้นตอนที่ 3: คลิกเตรียมตัว
         for _ in range(5):
-            click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=2)
+            click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=1)
         time.sleep(10)
         
         # ขั้นตอนที่ 4: เริ่มสเตจ
         click_with_delay(device, *CLICK_POSITIONS['start_stage'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['select_meteor'], delay_after=10)
         click_with_delay(device, *CLICK_POSITIONS['first_ranger'], delay_after=5)
-        click_with_delay(device, *CLICK_POSITIONS['use_meteor'], delay_after=5)
         
         # ขั้นตอนที่ 5: โจมตีศัตรู
-        for _ in range(10):
+        for _ in range(5):
             click_with_delay(device, *CLICK_POSITIONS['first_ranger'], delay_after=2)
             click_with_delay(device, *CLICK_POSITIONS['second_ranger'], delay_after=2)
             click_with_delay(device, *CLICK_POSITIONS['third_ranger'], delay_after=2)
             click_with_delay(device, *CLICK_POSITIONS['fourth_ranger'], delay_after=2)
-        
+
+        click_with_delay(device, *CLICK_POSITIONS['use_meteor'], delay_after=15)
+
         # ขั้นตอนที่ 6: รับรางวัล
         click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['receive_level'], delay_after=5)
@@ -277,15 +316,16 @@ def login_with_guestID(device):
         # ขั้นตอนที่ 2: ล็อกอินครั้งแรก
         click_with_delay(device, *CLICK_POSITIONS['sign_in_apple'], delay_after=5)
         for pos in ['check_box_1', 'check_box_2', 'check_box_3']:
-            click_with_delay(device, *CLICK_POSITIONS[pos], delay_after=5)
+            click_with_delay(device, *CLICK_POSITIONS[pos], delay_after=2)
+
         click_with_delay(device, *CLICK_POSITIONS['agree'], delay_after=5)
         
         # ย้อนกลับและลองใหม่
         press_back_button(device)
         time.sleep(3)
-        click_with_delay(device, *CLICK_POSITIONS['sign_in_apple'], delay_after=5)
+        click_with_delay(device, *CLICK_POSITIONS['sign_in_apple'], delay_after=2)
         for pos in ['check_box_1', 'check_box_2', 'check_box_3']:
-            click_with_delay(device, *CLICK_POSITIONS[pos], delay_after=5)
+            click_with_delay(device, *CLICK_POSITIONS[pos], delay_after=2)
         click_with_delay(device, *CLICK_POSITIONS['agree'], delay_after=5)
         press_back_button(device)
         time.sleep(3)
@@ -294,7 +334,8 @@ def login_with_guestID(device):
         click_with_delay(device, *CLICK_POSITIONS['guest_button'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['login_with_guest'], delay_after=5)
         for pos in ['check_box_1', 'check_box_2', 'check_box_3']:
-            click_with_delay(device, *CLICK_POSITIONS[pos], delay_after=5)
+            click_with_delay(device, *CLICK_POSITIONS[pos], delay_after=3)
+
         click_with_delay(device, *CLICK_POSITIONS['agree'], delay_after=10)
         
         # ขั้นตอนที่ 4: ตั้งค่าหลังล็อกอิน
@@ -357,7 +398,7 @@ def play_tutorial(device):
             click_with_delay(device, *CLICK_POSITIONS['fourth_ranger'], delay_after=2)
 
         print(f"✅ [Device: {device}] เล่น Tutorial เสร็จสิ้น")
-        time.sleep(30)
+        time.sleep(20)
         return True
 
     except Exception as e:
@@ -367,15 +408,15 @@ def play_tutorial(device):
 def re_id(device):
     try:
         package = "com.linecorp.LGRGS"
-        print(f"🧹 ล้างข้อมูล {device}")
-        adb_shell(device, f"pm clear {package}")
-        time.sleep(2)
-
+        if isFirstTime == False:
+            print(f"🧹 ล้างข้อมูล {device}")
+            adb_shell(device, f"pm clear {package}")
+            time.sleep(2)
         print(f"🚀 เปิดเกม {device}")
         adb_shell(device, f"monkey -p {package} -c android.intent.category.LAUNCHER 1")
         time.sleep(10)
         print(f"🚀 เริ่มรีไอดี {device}")
-
+        isFirstTime == True
         login_with_guestID(device)
         play_tutorial(device)
         play_until_load_data(device)
@@ -422,26 +463,13 @@ def debug_pixel(device):
     cv2.destroyAllWindows()
     print(f"🔚 จบการ Debug บน {device}")
 
-
-# ✅ ฟังก์ชันสำหรับลากหน้าจอ
 def swipe_screen(device, start_x, start_y, end_x, end_y, duration=1000):
     print(f"🖱️ ลากหน้าจอจาก ({start_x}, {start_y}) ไปยัง ({end_x}, {end_y}) ใช้เวลา {duration} ms")
     adb_shell(device, f"input swipe {start_x} {start_y} {end_x} {end_y} {duration}")
     time.sleep(1)  # รอให้การลากเสร็จ
 
-def monitor_app_loop(interval_sec=90):
-    print("📡 เริ่มการตรวจสอบแอปทุกๆ", interval_sec, "วินาที")
-    while True:
-        emulators = get_emulators()
-        for device in emulators:
-            print(f"🔍 ตรวจสอบแอปบน {device}")
-            if not check_app_status(device):
-                print(f"🔁 รีสตาร์ทแอป {device} ด้วย run_all()")
-                run_all()
-        time.sleep(interval_sec)
-
 def run_all_independent():
-    """รันแต่ละเครื่องแบบอิสระ ไม่ต้องรอพร้อมกัน"""
+    """รันแต่ละเครื่องแบบอิสระ"""
     emulators = get_emulators()
     if not emulators:
         print("❌ ไม่พบ Emulator ที่เปิดอยู่")
@@ -450,15 +478,19 @@ def run_all_independent():
     threads = []
     for device in emulators:
         thread = threading.Thread(
-            target=process_device_independent, 
+            target=re_id,  # เปลี่ยนจาก run_with_monitoring เป็น re_id โดยตรง
             args=(device,),
             name=f"Thread-{device}"
         )
         threads.append(thread)
         thread.start()
-        time.sleep(1)  # เว้นระยะเริ่มต้นแต่ละเครื่องเล็กน้อย
+        time.sleep(1)  # เว้นระยะเริ่มต้นแต่ละเครื่อง
     
     print(f"🚀 เริ่มทำงานบน {len(emulators)} เครื่อง...")
+    
+    # รอให้ทุกเธรดทำงานเสร็จ
+    for thread in threads:
+        thread.join()
 
 def process_device_independent(device):
     """กระบวนการสำหรับแต่ละเครื่องแบบอิสระ"""
@@ -467,28 +499,61 @@ def process_device_independent(device):
         re_id(device)
     except Exception as e:
         print(f"❌ [Device: {device}] เกิดข้อผิดพลาด: {e}")
-if __name__ == "__main__":
-    print("=== LRG Auto Re-ID Bot ===")
-    print("1. รันแบบอิสระ (ไม่ต้องรอพร้อมกัน)")
-    print("2. Debug ค่า Pixel")
-    choice = input("เลือกโหมด: ")
-    
-    if choice == "1":
-        while True:
-            run_all_independent()  # ใช้ฟังก์ชันใหม่ที่ทำงานอิสระ
-            print("\n🕓 รอ 90 วินาทีก่อนรอบต่อไป...")
-            time.sleep(90)
-    elif choice == "2":
-        emulators = get_emulators()
-        if not emulators:
-            print("ไม่พบ Emulator ที่เปิดอยู่")
-        else:
-            print(f"เลือก Emulator เพื่อ Debug:")
-            for i, emu in enumerate(emulators, 1):
-                print(f"{i}. {emu}")
-            emu_choice = int(input("เลือกหมายเลข: ")) - 1
-            debug_pixel(emulators[emu_choice])
-    elif choice == "3":
-        print("ตำแหน่งคลิกปัจจุบัน:")
-        for name, pos in CLICK_POSITIONS.items():
-            print(f"{name}: {pos}")
+
+running = False
+
+# ===== GUI Setup =====
+def log(msg):
+    output_text.config(state='normal')
+    output_text.insert(tk.END, f"{msg}\n")
+    output_text.see(tk.END)
+    output_text.config(state='disabled')
+
+def start_bot_thread():
+    thread = threading.Thread(target=start_bot, daemon=True)
+    thread.start()
+
+def start_bot():
+    global running
+    running = True
+    log("เริ่มทำงานบอท...")
+    run_all_independent()
+    while running:
+        log("บอทกำลังทำงาน...")
+        time.sleep(2)
+
+def stop_bot():
+    global running
+    running = False
+    log("หยุดการทำงานของบอทแล้ว")
+
+# ===== GUI Setup =====
+def log(msg):
+    output_text.config(state='normal')
+    output_text.insert(tk.END, f"{msg}\n")
+    output_text.see(tk.END)
+    output_text.config(state='disabled')
+
+def start_bot_thread():
+    thread = threading.Thread(target=start_bot, daemon=True)
+    thread.start()
+
+# ===== สร้าง GUI =====
+root = tk.Tk()
+root.title("Emulator Bot Controller")
+root.geometry("500x450")
+
+frame = ttk.Frame(root)
+frame.pack(pady=10)
+
+start_btn = ttk.Button(frame, text="▶ เริ่มบอท", command=start_bot_thread)
+start_btn.grid(row=0, column=0, padx=5)
+
+stop_btn = ttk.Button(frame, text="⏹ หยุดบอท", command=stop_bot)
+stop_btn.grid(row=0, column=1, padx=5)
+
+# แสดง Log ด้านล่าง
+output_text = scrolledtext.ScrolledText(root, height=18, state='disabled')
+output_text.pack(fill='both', expand=True, padx=10, pady=10)
+
+root.mainloop()
