@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, simpledialog, messagebox
 
 isFirstTime = False
+
 CLICK_POSITIONS = {
     'agree_button': (685, 310),  # ตำแหน่งปุ่มตกลง
     'allow_button': (631, 328),
@@ -36,18 +37,22 @@ CLICK_POSITIONS = {
     'mineral' : (812, 471),
     'stage_mode': (480, 98),
     'select_stage_1': (679, 445),
+    'select_stage_2': (478, 266),
     'start_stage'   :  (480, 476),
     'select_meteor' : (185, 359),
     'use_meteor' : (46, 46),
     'receive_level' : (475, 454),
     'gacha_btn' : (662, 115),
-    'random' : (360, 450),
+    'random_character' : (360, 450),
+    'confirm_random_character' : (554, 406),
     'receive_character': (396, 440),
     'select_team': (187, 473),
     'team_save_btn': (550, 359),
     'load_resource': (475, 360),
     'load_additional_resource': (554, 385),
     'close_large_popup': (816, 60),
+    'close_medium_popup': (859, 36),
+    'close_small_popup' : (816, 39),
     'setting_btn': (847, 500),
     'account_menu': (708, 91),
     'account_setting': (566, 421),
@@ -59,45 +64,25 @@ CLICK_POSITIONS = {
     'delete_valid_4' : (659, 430),
     'delete_account' : (475, 407),
     'load_login_completed'  : (44, 507),
-    'load_tutorial_completed'  : (14, 526)
-
+    'load_tutorial_completed' : (14, 526),
+    'load_resource_completed' : (143, 416), 
+    'load_game_with_ticket' : (246, 439),
+    'load_gacha_page_success' : (151, 386),
+    'close_popup_completed' : (544, 286), 
+    'slot' : (475, 454),
+    'open_teasure': (442, 143),
+    'receive_ticket': (476, 418),
+    'enter_7days' : (917, 238),
+    'receive_7days_ticket' : (336, 445),
+    'receive_7days_ticket_success' : (486, 408),
+    'open_gift_box' : (764, 463),
+    'receive_all_btn' : (697, 464),
+    'receive_all' : (554, 359),
+    'receive_all_success' : (478, 359),
+    'close_7days_popup' : (839, 40),
+    'back_btn' : (31, 27),
+    
 }
-def check_character_from_gacha(device, target_character):
-    """
-    ตรวจสอบตัวละครที่ได้จากกาชาโดยใช้การจับภาพหน้าจอ
-    - device: ชื่ออุปกรณ์ emulator
-    - target_character: ชื่อตัวละครที่ต้องการ (ต้องเตรียมภาพตัวอย่างไว้ในโฟลเดอร์)
-    """
-    try:
-        print(f"🔍 [Device: {device}] กำลังตรวจสอบตัวละครที่ได้จากกาชา...")
-        
-        # จับภาพหน้าจอตอนได้รับตัวละคร
-        img = screencap(device)
-        
-        # โหลดภาพตัวอย่างตัวละครที่ต้องการ
-        template_path = f"templates/{target_character}.png"
-        if not os.path.exists(template_path):
-            print(f"⚠️ ไม่พบไฟล์ภาพตัวอย่างสำหรับ {target_character}")
-            return False
-            
-        template = cv2.imread(template_path, cv2.IMREAD_COLOR)
-        
-        # ใช้ Template Matching
-        result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-        
-        # กำหนด threshold การจับคู่ (ปรับตามความเหมาะสม)
-        threshold = 0.8
-        if max_val >= threshold:
-            print(f"✅ [Device: {device}] พบตัวละครที่ต้องการ: {target_character}")
-            return True
-        else:
-            print(f"❌ [Device: {device}] ไม่พบตัวละครที่ต้องการ")
-            return False
-            
-    except Exception as e:
-        print(f"⚠️ [Device: {device}] เกิดข้อผิดพลาดขณะตรวจสอบตัวละคร: {e}")
-        return False
 
 def check_special_days(date=None):
     """
@@ -257,7 +242,7 @@ def play_until_load_data(device):
             click_with_delay(device, *CLICK_POSITIONS['third_ranger'], delay_after=2)
             click_with_delay(device, *CLICK_POSITIONS['fourth_ranger'], delay_after=2)
 
-        click_with_delay(device, *CLICK_POSITIONS['use_meteor'], delay_after=15)
+        click_with_delay(device, *CLICK_POSITIONS['use_meteor'], delay_after=30)
 
         # ขั้นตอนที่ 6: รับรางวัล
         click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
@@ -270,7 +255,7 @@ def play_until_load_data(device):
         click_with_delay(device, *CLICK_POSITIONS['skip'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['start_btn_skip'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['gacha_btn'], delay_after=10)
-        click_with_delay(device, *CLICK_POSITIONS['random'], delay_after=10)
+        click_with_delay(device, *CLICK_POSITIONS['random_character'], delay_after=10)
         click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=2)
         click_with_delay(device, *CLICK_POSITIONS['receive_character'], delay_after=10)
         
@@ -296,7 +281,7 @@ def play_until_load_data(device):
         # ขั้นตอนสุดท้าย: โหลดข้อมูล
         click_with_delay(device, *CLICK_POSITIONS['load_resource'], delay_after=20)
         click_with_delay(device, *CLICK_POSITIONS['load_additional_resource'], delay_after=5)
-        
+        time.sleep(20)
         print(f"✅ [Device: {device}] เล่นเกมจนโหลดข้อมูลเสร็จสมบูรณ์")
         return True
         
@@ -310,6 +295,7 @@ def login_with_guestID(device):
         print(f"\n🔵 [Device: {device}] เริ่มกระบวนการล็อกอิน...")
         
         # ขั้นตอนที่ 1: หน้าต้อนรับ
+        time.sleep(15)
         click_with_delay(device, *CLICK_POSITIONS['agree_button'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['allow_button'], delay_after=5)
         
@@ -347,7 +333,7 @@ def login_with_guestID(device):
         click_with_delay(device, *CLICK_POSITIONS['complete_name'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['skip'], delay_after=5)
         click_with_delay(device, *CLICK_POSITIONS['start_btn_skip'], delay_after=5)
-        
+        time.sleep(20)
         print(f"🟢 [Device: {device}] ล็อกอินสำเร็จทั้งหมด")
         return True
         
@@ -405,6 +391,147 @@ def play_tutorial(device):
         print(f"🔴 [Device: {device}] เกิดข้อผิดพลาดขณะเล่น Tutorial: {e}")
         return False
 
+def play_until_level_3(device):
+    if not wait_for_load(device, *CLICK_POSITIONS['load_resource_completed'], expected_color=[24, 211, 255], timeout=60):
+            print(f"🔴 [Device: {device}] โหลดทรัพยากรล้มเหลว")
+            return False
+    
+    click_with_delay(device, *CLICK_POSITIONS['stage_mode'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['select_stage_2'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['start_stage'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['use_meteor'], delay_after=5)
+
+    for _ in range(5):
+            click_with_delay(device, *CLICK_POSITIONS['first_ranger'], delay_after=2)
+            click_with_delay(device, *CLICK_POSITIONS['second_ranger'], delay_after=2)
+            click_with_delay(device, *CLICK_POSITIONS['third_ranger'], delay_after=2)
+            click_with_delay(device, *CLICK_POSITIONS['fourth_ranger'], delay_after=2)
+
+
+    for _ in range(2):
+        click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
+
+    click_with_delay(device, *CLICK_POSITIONS['receive_level'], delay_after=7)
+
+    for _ in range(4):
+        click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=2)
+
+    for _ in range(3):
+        click_with_delay(device, *CLICK_POSITIONS['slot'], delay_after=2)    
+
+    click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
+
+    click_with_delay(device, *CLICK_POSITIONS['skip'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['start_btn_skip'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['stage_mode'], delay_after=12)
+    click_with_delay(device, *CLICK_POSITIONS['open_teasure'], delay_after=5)
+
+    for _ in range(3):
+        click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
+    restart_all_emulators()
+    close_popup()
+
+def receive_7days(device):
+    if not wait_for_load(device, *CLICK_POSITIONS['load_resource_completed'], expected_color=[24, 211, 255], timeout=60):
+            print(f"🔴 [Device: {device}] โหลดทรัพยากรล้มเหลว")
+            return False
+    click_with_delay(device, *CLICK_POSITIONS['enter_7days'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['receive_7days_ticket'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['receive_7days_ticket_success'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['close_7days_popup'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['open_gift_box'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['receive_all_btn'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['receive_all'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['receive_all_success'], delay_after=5)
+
+    click_with_delay(device, *CLICK_POSITIONS['close_small_popup'], delay_after=5)
+
+
+def summon_rangers(device,round):
+    click_with_delay(device, *CLICK_POSITIONS['gacha_btn'], delay_after=5)
+    if not wait_for_load(device, *CLICK_POSITIONS['load_gacha_page_success'], expected_color=[107, 36, 107], timeout=60):
+            print(f"🔴 [Device: {device}] โหลดทรัพยากรล้มเหลว")
+            return False
+    for _ in range(round):
+        click_with_delay(device, *CLICK_POSITIONS['random_character'], delay_after=5)
+        click_with_delay(device, *CLICK_POSITIONS['confirm_random_character'], delay_after=5)
+        click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
+        click_with_delay(device, *CLICK_POSITIONS['receive_character'], delay_after=5)
+    click_with_delay(device, *CLICK_POSITIONS['back_btn'], delay_after=5)
+
+def restart_game(device):
+    """
+    รีเกมเข้าใหม่โดยไม่ลบข้อมูลเกม
+    - device: ชื่ออุปกรณ์ emulator
+    """
+    try:
+        print(f"\n🔄 [Device: {device}] กำลังรีเกมเข้าใหม่...")
+        
+        # 1. ปิดเกม
+        print(f"⏹ [Device: {device}] กำลังปิดแอปเกม...")
+        adb_shell(device, "am force-stop com.linecorp.LGRGS")
+        time.sleep(3)
+        
+        # 2. เปิดเกมใหม่
+        print(f"🚀 [Device: {device}] กำลังเปิดแอปเกมใหม่...")
+        adb_shell(device, "monkey -p com.linecorp.LGRGS -c android.intent.category.LAUNCHER 1")
+        time.sleep(15)  # รอให้เกมโหลด
+        
+        # 3. ตรวจสอบว่าเข้าสู่เกมแล้ว
+        if check_app_status(device):
+            print(f"✅ [Device: {device}] รีเกมสำเร็จ")
+            return True
+        else:
+            print(f"❌ [Device: {device}] ไม่สามารถเปิดเกมได้")
+            return False
+            
+    except Exception as e:
+        print(f"⚠️ [Device: {device}] เกิดข้อผิดพลาดขณะรีเกม: {e}")
+        return False
+
+def close_popup(device):
+    if not wait_for_load(device, *CLICK_POSITIONS['load_game_with_ticket'], expected_color=[33, 65, 123], timeout=60):
+            print(f"🔴 [Device: {device}] ไม่พบหน้าจอ Tutorial")
+            return False
+    for _ in range(10):
+        click_with_delay(device, *CLICK_POSITIONS['receive_ticket'], delay_after=2)
+    for _ in range(15):
+        click_with_delay(device, *CLICK_POSITIONS['close_medium_popup'], delay_after=1)
+        click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=1)
+    
+    if not wait_for_load(device, *CLICK_POSITIONS['close_popup_completed'], expected_color=[107, 138, 189], timeout=60):
+            print(f"🔴 [Device: {device}] ปิด popup ล้มเหลว")
+            return False
+    time.sleep(5)
+
+def restart_all_emulators():
+    """
+    รีเกมใหม่ทุกเครื่องพร้อมกันโดยไม่ลบข้อมูล
+    """
+    emulators = get_emulators()
+    if not emulators:
+        print("❌ ไม่พบ Emulator ที่เปิดอยู่")
+        return
+    
+    threads = []
+    for device in emulators:
+        thread = threading.Thread(
+            target=restart_game,
+            args=(device,),
+            name=f"RestartThread-{device}"
+        )
+        threads.append(thread)
+        thread.start()
+        time.sleep(1)  # เว้นระยะเริ่มต้นแต่ละเครื่อง
+    
+    print(f"🔄 กำลังรีเกมบน {len(emulators)} เครื่อง...")
+    
+    # รอให้ทุกเธรดทำงานเสร็จ
+    for thread in threads:
+        thread.join()
+    
+    print("✅ รีเกมทุกเครื่องเสร็จสิ้น")
+
 def re_id(device):
     try:
         package = "com.linecorp.LGRGS"
@@ -420,12 +547,20 @@ def re_id(device):
         login_with_guestID(device)
         play_tutorial(device)
         play_until_load_data(device)
-        delete_account(device)
+        # delete_account(device)
+        debug_pixel(device)
         
-        # บันทึกภาพหน้าจอ
+        if check_special_days(): 
+            play_until_level_3(device)
+        if not check_special_days():
+            close_popup(device)
+        receive_7days(device)
+        summon_rangers(device,2)
+        
         img = screencap(device)
         cv2.imwrite(f"{device}_screenshot.jpg", img)
-        print(f"✅ รีไอดีเสร็จ {device}")
+        print(f"✅ รีไอดีเสร็จ {device} กำลังดำเนินการลบไอดี")
+        # delete_account(device)
     except Exception as e:
         print(f"❌ เกิดข้อผิดพลาดใน re_id บน {device}: {str(e)}")
 
