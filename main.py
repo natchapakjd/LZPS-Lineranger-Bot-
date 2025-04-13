@@ -123,6 +123,7 @@ CLICK_POSITIONS = {
     'select_third_gacha' : (833, 441),
     'close_buff_event' : (814, 37) ,
     'close_gift_popup' : (803,33),
+    'close_authen_failed': (515, 360)
 }
 # process
 def get_emulators():
@@ -384,6 +385,7 @@ def login_with_guestID(device,isFirstTime = True):
             press_back_button(device)
             time.sleep(3)
 
+
             click_with_delayV2(device, *CLICK_POSITIONS['sign_in_apple'], delay_after=10, expected_color=[0,0,0])
             for pos in ['check_box_1', 'check_box_2', 'check_box_3']:
                 click_with_delayV2(device, *CLICK_POSITIONS[pos], delay_after=delay, expected_color=[255,255,255])
@@ -391,6 +393,8 @@ def login_with_guestID(device,isFirstTime = True):
             click_with_delayV2(device, *CLICK_POSITIONS['agree'], delay_after=delay, expected_color=[202, 241, 202])
             press_back_button(device)
             time.sleep(3)
+
+          
             
             # ขั้นตอนที่ 3: ล็อกอินแบบ Guest
             click_with_delayV2(device, *CLICK_POSITIONS['guest_button'], delay_after=10, expected_color=[66, 48, 49])
@@ -399,7 +403,15 @@ def login_with_guestID(device,isFirstTime = True):
                 click_with_delayV2(device, *CLICK_POSITIONS[pos], delay_after=delay, expected_color=[255,255,255])
 
             click_with_delayV2(device, *CLICK_POSITIONS['agree'], delay_after=10, expected_color=[202, 241, 202])
-            
+              
+            if not isFirstTime:
+                click_with_delayV2(device, *CLICK_POSITIONS['close_authen_failed'], delay_after=delay, expected_color=[49,195,0])
+                click_with_delayV2(device, *CLICK_POSITIONS['guest_button'], delay_after=10, expected_color=[66, 48, 49])
+                click_with_delayV2(device, *CLICK_POSITIONS['login_with_guest'], delay_after=10, expected_color=[250,250, 250])
+                for pos in ['check_box_1', 'check_box_2', 'check_box_3']:
+                    click_with_delayV2(device, *CLICK_POSITIONS[pos], delay_after=delay, expected_color=[255,255,255])
+
+            click_with_delayV2(device, *CLICK_POSITIONS['agree'], delay_after=10, expected_color=[202, 241, 202])
             # ขั้นตอนที่ 4: ตั้งค่าหลังล็อกอิน
             click_with_delayV2(device, *CLICK_POSITIONS['first_load_data'], delay_after=delay, expected_color=[ 10, 196,  67])
             click_with_delayV2(device, *CLICK_POSITIONS['ok'], delay_after=30, expected_color=[49, 195, 0])
@@ -710,9 +722,11 @@ def summon_rangers(device, round):
             target_dir = save_directory_path.get()
             if target_dir:
                 save_pref_file(device, found_char=found_char, target_dir=target_dir)
+                log(f"⚠️ พบตัวละคร {found_char} ทำการบันทึกลงโฟลเดอร์เสร็จสิ้น")
+                break
             else:
                 log("⚠️ ยังไม่ได้เลือกโฟลเดอร์สำหรับเซฟไฟล์")
-            
+
             # ถามผู้ใช้ว่าต้องการซัมมอนต่อหรือไม่
             if messagebox.askyesno("พบตัวละคร", f"พบ {found_char} แล้ว ต้องการซัมมอนต่อหรือไม่?"):
                 continue
@@ -1043,9 +1057,9 @@ def stop_bot():
 
 
 def toggle_resource():
-    global isLoadResource
-    isLoadResource = not load_resource_var.get()
-    log(f"🔄 Load Resource: {not isLoadResource}")
+    global isFirstTime
+    isFirstTime = not load_resource_var.get()
+    log(f"🔄 Load Resource: {not isFirstTime}")
 
 def toggle_7days():
     """Toggle 7-day rewards"""
