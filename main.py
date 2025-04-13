@@ -194,7 +194,7 @@ def re_id(device, isFirstTime=True,max_retries=5, current_retry=0):
             if isFirstTime:
                 login_with_guestID(device,isFirstTime = True)
             else :
-                login_with_guestID(device,isFirstTime = False)
+                login_with_guestID(device,isFirstTime = True)
             play_tutorial(device)
             play_until_load_data(device)
             if check_special_days()[0]:
@@ -208,11 +208,13 @@ def re_id(device, isFirstTime=True,max_retries=5, current_retry=0):
                 log(f"🎯 ซัมมอนจำนวน {summon_times} ครั้ง")
 
             print(f"✅ รีไอดีเสร็จ {device} กำลังดำเนินการลบไอดี และรีใหม่")
-            if not isFound:
-                delete_account(device)
-                return re_id(device, isFirstTime=False, max_retries=max_retries, current_retry=current_retry+1)
-            else:
-                return True  # ส่งค่ากลับเมื่อสำเร็จ
+            return re_id(device, isFirstTime=True, max_retries=max_retries, current_retry=current_retry+1)
+
+            # if not isFound:
+            #     delete_account(device)
+            #     return re_id(device, isFirstTime=False, max_retries=max_retries, current_retry=current_retry+1)
+            # else:
+            #     return True  # ส่งค่ากลับเมื่อสำเร็จ
 
         except Exception as e:
             print(f"❌ เกิดข้อผิดพลาดใน re_id บน {device}: {str(e)}")
@@ -381,7 +383,7 @@ def login_with_guestID(device,isFirstTime = True):
                 click_with_delayV2(device, *CLICK_POSITIONS[pos], delay_after=delay, expected_color=[255,255,255])
 
             click_with_delayV2(device, *CLICK_POSITIONS['agree'], delay_after=delay, expected_color=[202, 241, 202])
-            
+        
             press_back_button(device)
             time.sleep(3)
 
@@ -395,7 +397,6 @@ def login_with_guestID(device,isFirstTime = True):
             time.sleep(3)
 
           
-            
             # ขั้นตอนที่ 3: ล็อกอินแบบ Guest
             click_with_delayV2(device, *CLICK_POSITIONS['guest_button'], delay_after=10, expected_color=[66, 48, 49])
             click_with_delayV2(device, *CLICK_POSITIONS['login_with_guest'], delay_after=10, expected_color=[250,250, 250])
@@ -411,7 +412,8 @@ def login_with_guestID(device,isFirstTime = True):
                 for pos in ['check_box_1', 'check_box_2', 'check_box_3']:
                     click_with_delayV2(device, *CLICK_POSITIONS[pos], delay_after=delay, expected_color=[255,255,255])
 
-            click_with_delayV2(device, *CLICK_POSITIONS['agree'], delay_after=10, expected_color=[202, 241, 202])
+                click_with_delayV2(device, *CLICK_POSITIONS['agree'], delay_after=10, expected_color=[202, 241, 202])
+
             # ขั้นตอนที่ 4: ตั้งค่าหลังล็อกอิน
             click_with_delayV2(device, *CLICK_POSITIONS['first_load_data'], delay_after=delay, expected_color=[ 10, 196,  67])
             click_with_delayV2(device, *CLICK_POSITIONS['ok'], delay_after=30, expected_color=[49, 195, 0])
