@@ -27,6 +27,9 @@ delay = 3
 select_gacha_number = ['common','rate-up(1)','rate-up(2)']
 isFirstTime  = True
 isFound = False
+pref_files = []
+current_file_index = 0
+is_login_running = False
 
 CLICK_POSITIONS = {
     'agree_button': (685, 310),  # ตำแหน่งปุ่มตกลง
@@ -125,6 +128,154 @@ CLICK_POSITIONS = {
     'close_gift_popup' : (803,33),
     'close_authen_failed': (515, 360)
 }
+
+def get_pref_files(directory):
+    """Get all .xml files in the specified directory"""
+    global pref_files
+    pref_files = [f for f in os.listdir(directory) if f.endswith('.xml') and '_LINE_COCOS_PREF_KEY' in f]
+    return len(pref_files)
+
+def copy_pref_to_device(device, pref_file, source_dir):
+    """Copy PREF file to device"""
+    try:
+        android_path = "/data/data/com.linecorp.LGRGS/shared_prefs/_LINE_COCOS_PREF_KEY.xml"
+        source_path = os.path.join(source_dir, pref_file)
+        
+        # 1. Root the device
+        os.system(f"adb -s {device} root")
+        os.system(f"adb -s {device} remount")
+        
+        # 2. Push the file
+        push_cmd = f"adb -s {device} push \"{source_path}\" \"{android_path}\""
+        result = os.system(push_cmd)
+        
+        if result != 0:
+            log(f"❌ {device}: Failed to push PREF file")
+            return False
+            
+        # 3. Set permissions
+        os.system(f"adb -s {device} shell chmod 777 \"{android_path}\"")
+        
+        log(f"✅ {device}: Copied {pref_file} successfully")
+        return True
+        
+    except Exception as e:
+        log(f"❌ {device}: Error copying PREF file: {str(e)}")
+        return False
+def daily_login(device):
+    """Perform daily login tasks"""
+    try:
+        log(f"📅 {device}: Starting daily login...")
+        f = 1
+        restart_game(device)
+
+        # ✅ รอไม่เกิน 60 วิ ถ้าไม่เจอ expected color ก็ข้าม
+        try:
+            click_with_delayV2(
+                device,
+                *CLICK_POSITIONS['load_additional_resource'],
+                delay_after=5,
+                expected_color=[49, 195, 0],
+                timeout=60  # 👈 เพิ่ม timeout ตรงนี้ถ้าฟังก์ชันรองรับ
+            )
+        except TimeoutError:
+            log(f"⏭️ {device}: load_additional_resource timeout — skipping")
+
+        if not wait_for_load(device, *CLICK_POSITIONS['load_game_with_calendar'], expected_color=[198, 227, 247], timeout=180):
+            print(f"🔴 [Device: {device}] ไม่พบหน้า Calendar")
+            return False
+
+        log(f"✅ {device}: Daily login completed")
+        return True
+
+    except Exception as e:
+        log(f"❌ {device}: Daily login failed: {str(e)}")
+        return False
+
+
+def process_device_with_pref(device, pref_file, source_dir):
+    """Process a single device with a PREF file"""
+    if not copy_pref_to_device(device, pref_file, source_dir):
+        return False
+        
+    if not daily_login(device):
+        return False
+        
+    return True
+def login_from_prefs():
+    """Main function to login from PREF files"""
+    global current_file_index, is_login_running, active_threads
+    
+    if not pref_files:
+        messagebox.showwarning("No Files", "No PREF files found in selected directory")
+        return
+        
+    source_dir = save_directory_path.get()
+    if not source_dir:
+        messagebox.showwarning("No Directory", "Please select a directory first")
+        return
+        
+    emulators = get_emulators()
+    if not emulators:
+        log("❌ No emulators found")
+        return
+        
+    is_login_running = True
+    total_files = len(pref_files)
+    active_threads = []
+    log(f"🔁 Starting login for {total_files} PREF files on {len(emulators)} devices")
+    
+    while current_file_index < total_files and is_login_running:
+        # Distribute files to available devices
+        for device in emulators:
+            if current_file_index >= total_files:
+                break
+                
+            # Check if device is busy
+            if any(t.device == device for t in active_threads):
+                continue
+                
+            file_num = current_file_index + 1
+            pref_file = pref_files[current_file_index]
+            clean_name = pref_file.split('_LINE_COCOS_PREF_KEY')[0]
+            
+            log(f"📁 Processing {file_num}/{total_files}: {clean_name} on {device}")
+            
+            # Create and start thread
+            thread = DeviceThread(device, pref_file, source_dir)
+            thread.start()
+            active_threads.append(thread)
+            
+            current_file_index += 1
+            time.sleep(2)  # Small delay between device starts
+        
+        # Clean up finished threads
+        active_threads = [t for t in active_threads if t.is_alive()]
+        
+        # Wait if all devices are busy
+        if len(active_threads) >= len(emulators):
+            time.sleep(5)
+    
+    # Wait for all threads to complete
+    for thread in active_threads:
+        thread.join()
+    
+    is_login_running = False
+    log("✅ All PREF files processed")
+
+class DeviceThread(threading.Thread):
+    def __init__(self, device, pref_file, source_dir):
+        super().__init__()
+        self.device = device
+        self.pref_file = pref_file
+        self.source_dir = source_dir
+        
+    def run(self):
+        try:
+            process_device_with_pref(self.device, self.pref_file, self.source_dir)
+        except Exception as e:
+            log(f"❌ {self.device}: Thread error: {str(e)}")
+
 # process
 def get_emulators():
     """Get list of connected emulators excluding excluded_devices"""
@@ -926,6 +1077,12 @@ def restart_game(device):
         adb_shell(device, "monkey -p com.linecorp.LGRGS -c android.intent.category.LAUNCHER 1")
         time.sleep(15)  # รอให้เกมโหลด
         
+            # ตรวจสอบหน้าจอเทาก่อนเริ่ม
+        if check_pixel_color(device, *CLICK_POSITIONS['is_gray_screen'], [48, 48, 48], tolerance=5):
+            print(f"⚠️ [Device: {device}] ตรวจพบจอเทา! จะรีลองใหม่...")
+            restart_game(device)
+            time.sleep(10)
+        
         # 3. ตรวจสอบว่าเข้าสู่เกมแล้ว
         if check_app_status(device):
             print(f"✅ [Device: {device}] รีเกมสำเร็จ")
@@ -1056,6 +1213,43 @@ def stop_bot():
     log("หยุดการทำงานของบอทแล้ว")
     time.sleep(2)  # รอให้ thread อื่นๆ หยุดทำงาน
 
+
+def stop_login():
+    """Stop the login process"""
+    global is_login_running
+    is_login_running = False
+    log("⏹ Stopped PREF login process")
+
+## GUI Additions
+def add_pref_login_gui():
+    """Add PREF login controls to GUI"""
+    pref_frame = ttk.LabelFrame(main_frame, text="🔑 Login from PREF Files", padding=10)
+    pref_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=5)
+    
+    # File count display
+    file_count_var = tk.StringVar(value="0 PREF files found")
+    file_count_label = ttk.Label(pref_frame, textvariable=file_count_var)
+    file_count_label.grid(row=0, column=0, columnspan=2, pady=5)
+    
+    # Scan directory button
+    def scan_directory():
+        directory = save_directory_path.get()
+        if directory:
+            count = get_pref_files(directory)
+            file_count_var.set(f"{count} PREF files found")
+        else:
+            messagebox.showwarning("No Directory", "Please select a directory first")
+    
+    scan_btn = ttk.Button(pref_frame, text="🔍 Scan Directory", command=scan_directory)
+    scan_btn.grid(row=1, column=0, padx=5, pady=5)
+    
+    # Start login button
+    start_login_btn = ttk.Button(pref_frame, text="▶ Start Login", command=lambda: threading.Thread(target=login_from_prefs, daemon=True).start())
+    start_login_btn.grid(row=1, column=1, padx=5, pady=5)
+    
+    # Stop login button
+    stop_login_btn = ttk.Button(pref_frame, text="⏹ Stop Login", command=stop_login)
+    stop_login_btn.grid(row=1, column=2, padx=5, pady=5)
 
 
 def toggle_resource():
@@ -1339,4 +1533,5 @@ monitoring_cb = ttk.Checkbutton(
 )
 monitoring_cb.grid(row=3, column=0, sticky="w", pady=2)
 # Main loop
+add_pref_login_gui()
 root.mainloop()
