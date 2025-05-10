@@ -12,6 +12,7 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 from PIL import Image
 from tkinter import font as tkfont
+import pytz
 
 monitoring_active = True  # ค่าเริ่มต้น
 isLoadResource = True
@@ -61,13 +62,13 @@ CLICK_POSITIONS = {
     'stage_mode': (481, 79),
     'select_stage_1': (486, 480),
     'select_stage_1_tutorial': (686, 449),
-    'select_stage_2': (478, 266),
+    'select_stage_2': (491, 266),
     'start_stage'   :  (478, 94),
     'start_stage_1_tutorial': (592, 476),
     'used_meteor_tutorial' : (44, 56), 
     'select_meteor' : (185, 359),  
-    'use_meteor' : (46, 46),
-    'receive_level' : (475, 454),
+    'use_meteor' : (46, 46),  
+    'receive_level' : (475, 454),  
     'gacha_btn' : (662, 115),
     'random_character' : (360, 450),
     'confirm_random_character' : (554, 406),
@@ -93,7 +94,7 @@ CLICK_POSITIONS = {
     'load_login_completed'  : (44, 507),
     'load_tutorial_completed' : (14, 526),
     'load_resource_completed' : (143, 416), 
-    'load_game_with_ticket' : (246, 439),
+    'load_game_with_ticket' : (521, 416),
     'load_game_with_calendar' : (360, 346),
     'load_gacha_page_success' : (151, 386),
     'load_stage' : (40, 515),
@@ -126,9 +127,68 @@ CLICK_POSITIONS = {
     'select_third_gacha' : (833, 441),
     'close_buff_event' : (814, 37) ,
     'close_gift_popup' : (803,33),
-    'close_authen_failed': (515, 360)
+    'close_authen_failed': (515, 360),
+    'red_carpet' : (259, 460),
+    'receive_level_2': (396, 457),
 }
 
+def login_from_single_file(device, root=None):
+    """Perform login using a single selected .xml PREF file."""
+    try:
+        # Step 1: Prompt user to select a single .xml file
+        file_path = filedialog.askopenfilename(
+            title="Select PREF File",
+            filetypes=[("XML files", "*.xml")],
+            parent=root
+        )
+        
+        if not file_path:
+            messagebox.showwarning("No File Selected", "Please select a PREF file to proceed.")
+            return False
+        
+        # Validate file
+        if not file_path.endswith('.xml') or '_LINE_COCOS_PREF_KEY' not in file_path:
+            messagebox.showerror("Invalid File", "Selected file is not a valid PREF file.")
+            return False
+
+        file_name = os.path.basename(file_path)
+        log(f"📄 {device}: Selected PREF file: {file_name}")
+
+        # Step 2: Copy the PREF file to the device
+        if not copy_pref_to_device(device, file_name, os.path.dirname(file_path)):
+            log(f"❌ {device}: Failed to copy PREF file")
+            return False
+
+        # Step 3: Restart the game
+        log(f"🔄 {device}: Restarting game...")
+        if not restart_game(device):
+            log(f"❌ {device}: Failed to restart game")
+            return False
+
+        # Step 4: Wait for additional resources to load (similar to daily_login)
+        try:
+            click_with_delayV2(
+                device,
+                *CLICK_POSITIONS['load_additional_resource'],
+                delay_after=5,
+                expected_color=[49, 195, 0],
+                timeout=60
+            )
+        except TimeoutError:
+            log(f"�generator{device}: load_additional_resource timeout — skipping")
+
+        # Step 5: Wait for the game calendar screen to confirm login
+        if not wait_for_load(device, *CLICK_POSITIONS['load_game_with_calendar'], expected_color=[198, 227, 247], timeout=180):
+            log(f"🔴 {device}: Failed to find Calendar screen")
+            return False
+
+        log(f"✅ {device}: Login with PREF file {file_name} completed successfully")
+        return True
+
+    except Exception as e:
+        log(f"❌ {device}: Login failed: {str(e)}")
+        return False
+    
 def get_pref_files(directory):
     """Get all .xml files in the specified directory"""
     global pref_files
@@ -162,6 +222,7 @@ def copy_pref_to_device(device, pref_file, source_dir):
     except Exception as e:
         log(f"❌ {device}: Error copying PREF file: {str(e)}")
         return False
+
 def daily_login(device):
     """Perform daily login tasks"""
     try:
@@ -176,7 +237,7 @@ def daily_login(device):
                 *CLICK_POSITIONS['load_additional_resource'],
                 delay_after=5,
                 expected_color=[49, 195, 0],
-                timeout=60  # 👈 เพิ่ม timeout ตรงนี้ถ้าฟังก์ชันรองรับ
+                timeout=30  # 👈 เพิ่ม timeout ตรงนี้ถ้าฟังก์ชันรองรับ
             )
         except TimeoutError:
             log(f"⏭️ {device}: load_additional_resource timeout — skipping")
@@ -184,14 +245,37 @@ def daily_login(device):
         if not wait_for_load(device, *CLICK_POSITIONS['load_game_with_calendar'], expected_color=[198, 227, 247], timeout=180):
             print(f"🔴 [Device: {device}] ไม่พบหน้า Calendar")
             return False
+        
+        try:
+            click_with_delayV2(
+                device,
+                *CLICK_POSITIONS['close_calendar'],
+                delay_after=5,
+                # expected_color=[49, 195, 0],
+                timeout=5  # 👈 เพิ่ม timeout ตรงนี้ถ้าฟังก์ชันรองรับ
+            )
+        except TimeoutError:
+            log(f"⏭️ {device}: load_additional_resource timeout — skipping")
 
+        try:
+            for _ in range(3):
+                click_with_delayV2(
+                    device,
+                    *CLICK_POSITIONS['receive_ticket'],
+                    delay_after=2,
+                    timeout=3  # 👈 เพิ่ม timeout ตรงนี้ถ้าฟังก์ชันรองรับ
+                )
+        except TimeoutError:
+            log(f"⏭️ {device}: load_additional_resource timeout — skipping")
+
+
+        
         log(f"✅ {device}: Daily login completed")
         return True
 
     except Exception as e:
         log(f"❌ {device}: Daily login failed: {str(e)}")
         return False
-
 
 def process_device_with_pref(device, pref_file, source_dir):
     """Process a single device with a PREF file"""
@@ -202,6 +286,7 @@ def process_device_with_pref(device, pref_file, source_dir):
         return False
         
     return True
+
 def login_from_prefs():
     """Main function to login from PREF files"""
     global current_file_index, is_login_running, active_threads
@@ -325,6 +410,7 @@ def process_device_independent(device):
 def adb_shell(device, command):
     return os.system(f"adb -s {device} shell {command}")
 # main feature
+
 def re_id(device, isFirstTime=True,max_retries=5, current_retry=0):
 
     if current_retry >= max_retries:
@@ -549,7 +635,7 @@ def login_with_guestID(device,isFirstTime = True):
 
           
             # ขั้นตอนที่ 3: ล็อกอินแบบ Guest
-            click_with_delayV2(device, *CLICK_POSITIONS['guest_button'], delay_after=10, expected_color=[66, 48, 49])
+            click_with_delayV2(device, *CLICK_POSITIONS['guest_button'], delay_after=10)
             click_with_delayV2(device, *CLICK_POSITIONS['login_with_guest'], delay_after=10, expected_color=[250,250, 250])
             for pos in ['check_box_1', 'check_box_2', 'check_box_3']:
                 click_with_delayV2(device, *CLICK_POSITIONS[pos], delay_after=delay, expected_color=[255,255,255])
@@ -558,7 +644,7 @@ def login_with_guestID(device,isFirstTime = True):
               
             if not isFirstTime:
                 click_with_delayV2(device, *CLICK_POSITIONS['close_authen_failed'], delay_after=delay, expected_color=[49,195,0])
-                click_with_delayV2(device, *CLICK_POSITIONS['guest_button'], delay_after=10, expected_color=[66, 48, 49])
+                click_with_delayV2(device, *CLICK_POSITIONS['guest_button'], delay_after=10)
                 click_with_delayV2(device, *CLICK_POSITIONS['login_with_guest'], delay_after=10, expected_color=[250,250, 250])
                 for pos in ['check_box_1', 'check_box_2', 'check_box_3']:
                     click_with_delayV2(device, *CLICK_POSITIONS[pos], delay_after=delay, expected_color=[255,255,255])
@@ -649,32 +735,38 @@ def play_tutorial(device):
         return False
 
 def play_until_level_3(device):
-  
+    if not wait_for_load(device, *CLICK_POSITIONS['load_game_with_calendar'], expected_color=[198,227, 247], timeout=300):
+                    print(f"🔴 [Device: {device}] ไม่พบหน้า Calendar")
+    
     for _ in range(3):
         click_with_delay(device, *CLICK_POSITIONS['close_calendar'], delay_after=5)
 
 
-    click_with_delay(device, *CLICK_POSITIONS['stage_mode'], delay_after=5)
-    click_with_delay(device, *CLICK_POSITIONS['select_stage_2'], delay_after=5)
-    click_with_delay(device, *CLICK_POSITIONS['start_stage'], delay_after=5)
+    click_with_delayV2(device, *CLICK_POSITIONS['stage_mode'], delay_after=10,expected_color=[49, 60, 66])
+    click_with_delayV2(device, *CLICK_POSITIONS['select_stage_2'], delay_after=delay,expected_color=[115, 219, 247]) 
+    click_with_delayV2(device, *CLICK_POSITIONS['start_stage_1_tutorial'], delay_after=2,expected_color=[ 49, 195, 0])
     click_with_delay(device, *CLICK_POSITIONS['use_meteor'], delay_after=5)
 
     for _ in range(5):
             click_with_delay(device, *CLICK_POSITIONS['first_ranger'], delay_after=2)
             click_with_delay(device, *CLICK_POSITIONS['second_ranger'], delay_after=2)
-            click_with_delay(device, *CLICK_POSITIONS['third_ranger'], delay_after=2)
+            click_with_delay(device, *CLICK_POSITIONS['third_ranger'], delay_after=2)  
             click_with_delay(device, *CLICK_POSITIONS['fourth_ranger'], delay_after=2)
 
+    if not wait_for_load(device, *CLICK_POSITIONS['red_carpet'], expected_color=[0,0,181], timeout=180):
+                    print(f"🔴 [Device: {device}] ไม่พบพรมแดง")
+                    return False
+    
 
     for _ in range(2):
         click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
 
-    click_with_delay(device, *CLICK_POSITIONS['receive_level'], delay_after=7)
+    click_with_delayV2(device, *CLICK_POSITIONS['receive_level_2'], delay_after=5,expected_color=[ 49, 195, 0]) 
 
     for _ in range(4):
         click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=2)
 
-    for _ in range(3):
+    for _ in range(5):
         click_with_delay(device, *CLICK_POSITIONS['slot'], delay_after=2)    
 
     click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
@@ -687,7 +779,7 @@ def play_until_level_3(device):
     for _ in range(3):
         click_with_delay(device, *CLICK_POSITIONS['click'], delay_after=5)
     restart_all_emulators()
-    close_popup(device,1)
+    close_popup(device,0)
 
 def receive_7days(device):
     if not wait_for_load(device, *CLICK_POSITIONS['load_resource_completed'], expected_color=[24, 211, 255], timeout=180):
@@ -707,6 +799,10 @@ def receive_7days(device):
 def close_popup(device,flag):
     if flag == 1:
         if not wait_for_load(device, *CLICK_POSITIONS['load_game_with_calendar'], expected_color=[198,227, 247], timeout=180):
+                    print(f"🔴 [Device: {device}] ไม่พบหน้า Calendar")
+                    return False
+    if flag == 2:
+        if not wait_for_load(device, *CLICK_POSITIONS['load_game_with_ticket'], expected_color=[49,195, 0], timeout=180):
                     print(f"🔴 [Device: {device}] ไม่พบหน้า Calendar")
                     return False
     print("เริ่มปิด popup")
@@ -979,7 +1075,6 @@ def swipe_screen(device, start_x, start_y, end_x, end_y, duration=1000):
     adb_shell(device, f"input swipe {start_x} {start_y} {end_x} {end_y} {duration}")
     time.sleep(1)  # รอให้การลากเสร็จ
 
-  
 def press_back_button(device):
     print(f"🔙 กดปุ่มกลับบน {device}")
     adb_shell(device, "input keyevent 4")  # คำสั่งสำหรับกดปุ่มกลับ
@@ -1006,25 +1101,35 @@ def wait_for_event(device, condition_func, timeout=60, interval=1, *args, **kwar
 
 def check_special_days(date=None):
     """
-    ตรวจสอบว่าวันที่ระบุเป็นวันอังคาร, เสาร์, หรืออาทิตย์
+    ตรวจสอบว่าวันที่ระบุเป็นวันอังคาร, เสาร์, อาทิตย์ หรือ
+    วันจันทร์, ศุกร์, เสาร์ หลัง 22:00 ตามเวลาไทย
     ถ้าไม่ระบุวันที่ จะใช้เวลาปัจจุบัน
     """
-    # ถ้าไม่ระบุวันที่ ใช้เวลาปัจจุบัน
+    # ถ้าไม่ระบุวันที่ ใช้เวลาปัจจุบันใน timezone ไทย (UTC+7)
     if date is None:
-        date = datetime.now()
+        tz = pytz.timezone('Asia/Bangkok')
+        date = datetime.now(tz)
     
     # ดึงค่า weekday (0 = จันทร์, 1 = อังคาร, ..., 6 = อาทิตย์)
     weekday = date.weekday()
     
-    # ตรวจสอบและคืนค่าผลลัพธ์
-    if weekday == 1:  # อังคาร
-        return True, "วันอังคาร"
-    elif weekday == 5:  # เสาร์
-        return True, "วันเสาร์"
-    elif weekday == 6:  # อาทิตย์
-        return True, "วันอาทิตย์"
-    else:
-        return False, "ไม่ใช่วันอังคาร, เสาร์, หรืออาทิตย์"
+    # ดึงชั่วโมง (24-hour format)
+    hour = date.hour
+    
+    # ตรวจสอบวันอังคาร, เสาร์, หรืออาทิตย์ (ไม่สนใจเวลา)
+    if weekday in [1, 5, 6]:  # อังคาร, เสาร์, อาทิตย์
+        day_name = {1: "วันอังคาร", 5: "วันเสาร์", 6: "วันอาทิตย์"}[weekday]
+        return True, day_name
+    
+    # ตรวจสอบวันจันทร์, ศุกร์, เสาร์ หลัง 22:00
+    if weekday in [0, 4, 5]:  # จันทร์, ศุกร์, เสาร์
+        if hour >= 22:  # 22:00 หรือหลังจากนั้น
+            day_name = {0: "วันจันทร์", 4: "วันศุกร์", 5: "วันเสาร์"}[weekday]
+            return True, f"{day_name} หลัง 22:00"
+    
+    # กรณีอื่นๆ
+    day_name = {0: "วันจันทร์", 2: "วันพุธ", 3: "วันพฤหัสบดี", 4: "วันศุกร์"}.get(weekday, "ไม่ระบุวัน")
+    return False, f"{day_name} ไม่ใช่วันพิเศษหรือเวลาไม่ถึง 22:00"
 
 def check_pixel_color(device, x, y, expected_color, tolerance=10):
     """
@@ -1213,7 +1318,6 @@ def stop_bot():
     log("หยุดการทำงานของบอทแล้ว")
     time.sleep(2)  # รอให้ thread อื่นๆ หยุดทำงาน
 
-
 def stop_login():
     """Stop the login process"""
     global is_login_running
@@ -1250,7 +1354,6 @@ def add_pref_login_gui():
     # Stop login button
     stop_login_btn = ttk.Button(pref_frame, text="⏹ Stop Login", command=stop_login)
     stop_login_btn.grid(row=1, column=2, padx=5, pady=5)
-
 
 def toggle_resource():
     global isFirstTime
@@ -1354,8 +1457,7 @@ def toggle_monitoring():
     global monitoring_active
     monitoring_active = monitoring_var.get()
     log(f"📡 Monitoring {'เปิด' if monitoring_active else 'ปิด'}")
-
-    
+   
 def update_global_delay(*args):
     global delay
     try:
